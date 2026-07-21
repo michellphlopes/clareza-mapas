@@ -1042,17 +1042,18 @@ function edgePath(m,els,pid,cid){
   const hit=firstObstacle(m,els,bz,pid,cid);
   if(!hit)return reto;
   const t=_pos[hit],w=els[hit].offsetWidth,h=els[hit].offsetHeight;
-  const cima=t.y-h/2-22, baixo=t.y+h/2+22;
+  const cima=t.y-h/2-26, baixo=t.y+h/2+26;
   const refY=(bz[0][1]+bz[3][1])/2;
   const Wy=Math.abs(cima-refY)<=Math.abs(baixo-refY)?cima:baixo;
-  const x1=bz[0][0],x2=bz[3][0];
-  const lo=Math.min(x1,x2)+30,hi=Math.max(x1,x2)-30;
-  if(lo>=hi)return reto; // curto demais pra desviar
-  const Wx=Math.max(lo,Math.min(hi,t.x+w/2));
-  // dois segmentos com controles proporcionais: sempre pra frente, sem laço
-  const f1=Wx-x1, f2=x2-Wx, y1=bz[0][1], y2=bz[3][1];
-  return `M${x1},${y1} C${x1+f1*0.35},${y1} ${x1+f1*0.75},${Wy} ${Wx},${Wy}`+
-         ` C${Wx+f2*0.25},${Wy} ${Wx+f2*0.65},${y2} ${x2},${y2}`;
+  const x1=bz[0][0],x2=bz[3][0],y1=bz[0][1],y2=bz[3][1];
+  const dir=Math.sign(x2-x1)||1;
+  // trecho RETO por cima/baixo da tag inteira: entra antes, atravessa, sai depois
+  const Wa=dir>0?t.x-14:t.x+w+14;       // borda de entrada
+  const Wb=dir>0?t.x+w+14:t.x-14;       // borda de saída
+  if(dir*(Wa-x1)<28||dir*(x2-Wb)<28)return reto; // sem espaço pro desvio
+  return `M${x1},${y1} C${x1+(Wa-x1)*0.35},${y1} ${x1+(Wa-x1)*0.75},${Wy} ${Wa},${Wy}`+
+         ` L${Wb},${Wy}`+
+         ` C${Wb+(x2-Wb)*0.25},${Wy} ${Wb+(x2-Wb)*0.65},${y2} ${x2},${y2}`;
 }
 function drawEdges(m,els){
   let d='';

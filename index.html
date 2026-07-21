@@ -1049,8 +1049,10 @@ function edgePath(m,els,pid,cid){
   const lo=Math.min(x1,x2)+30,hi=Math.max(x1,x2)-30;
   if(lo>=hi)return reto; // curto demais pra desviar
   const Wx=Math.max(lo,Math.min(hi,t.x+w/2));
-  const kk=(x2>=x1?1:-1)*46;
-  return `M${x1},${bz[0][1]} C${bz[1][0]},${bz[1][1]} ${Wx-kk},${Wy} ${Wx},${Wy} C${Wx+kk},${Wy} ${bz[2][0]},${bz[2][1]} ${x2},${bz[3][1]}`;
+  // dois segmentos com controles proporcionais: sempre pra frente, sem laço
+  const f1=Wx-x1, f2=x2-Wx, y1=bz[0][1], y2=bz[3][1];
+  return `M${x1},${y1} C${x1+f1*0.35},${y1} ${x1+f1*0.75},${Wy} ${Wx},${Wy}`+
+         ` C${Wx+f2*0.25},${Wy} ${Wx+f2*0.65},${y2} ${x2},${y2}`;
 }
 function drawEdges(m,els){
   let d='';

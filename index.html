@@ -823,10 +823,18 @@ function snapSiblings(m,els){
   const pais=[...new Set(Object.keys(els).map(id=>m.nodes[id]&&m.nodes[id].parentId).filter(Boolean))];
   pais.forEach(p=>{
     const kids=children(m,p).filter(c=>els[c.id]&&_pos[c.id]).sort((a,b)=>_pos[a.id].y-_pos[b.id].y);
+    if(!kids.length)return;
+    // compara com a posição ORIGINAL do vizinho de cima: escadinha longa
+    // colapsa inteira na mesma coluna, sem quebrar a corrente no meio
+    let prevOrig=edge(kids[0].id),prevFinal=prevOrig;
     for(let i=1;i<kids.length;i++){
-      const prev=edge(kids[i-1].id),cur=edge(kids[i].id);
-      const df=cur-prev;
-      if(Math.abs(df)<=SNAP&&Math.abs(df)>0.5)setEdge(kids[i].id,prev);
+      const cur=edge(kids[i].id);
+      if(Math.abs(cur-prevOrig)<=SNAP){
+        if(Math.abs(cur-prevFinal)>0.5)setEdge(kids[i].id,prevFinal);
+        prevOrig=cur;
+      }else{
+        prevOrig=cur;prevFinal=cur;
+      }
     }
   });
 }

@@ -1443,7 +1443,9 @@ function dragMove(e){
       m.nodes[id].fx=_pos[id].x;m.nodes[id].fy=_pos[id].y;
     });
     // 2. em cima de uma tag? ela vira alvo e NÃO é empurrada (dá pra soltar nela)
-    const hov=dropHover(px,py,drag.ids);
+    //    EXCEÇÃO: irmão nunca vira alvo — entre irmãos o arrasto TROCA A ORDEM
+    let hov=dropHover(px,py,drag.ids);
+    if(hov&&m.nodes[hov]&&m.nodes[hov].parentId===m.nodes[drag.pressed].parentId)hov=null;
     // 3. física: filho à frente do pai; perto empurra; esticou demais puxa;
     //    tag intrusa sai de cima das linhas; irmão troca de ordem
     const bias={dy:Math.sign(dy),parentId:m.nodes[drag.pressed].parentId};

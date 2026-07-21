@@ -866,14 +866,18 @@ function snapSiblings(m,els){
     if(!kids.length)return;
     // compara com a posição ORIGINAL do vizinho de cima: escadinha longa
     // colapsa inteira na mesma coluna, sem quebrar a corrente no meio
-    let prevOrig=edge(kids[0].id),prevFinal=prevOrig;
+    // corrente do ímã olha AS DUAS bordas (esquerda e direita): larguras de
+    // texto diferentes não podem impedir o alinhamento
+    const eL=id=>_pos[id].x, eR=id=>_pos[id].x+els[id].offsetWidth;
+    let prevL=eL(kids[0].id),prevR=eR(kids[0].id),prevFinal=edge(kids[0].id);
     for(let i=1;i<kids.length;i++){
-      const cur=edge(kids[i].id);
-      if(Math.abs(cur-prevOrig)<=SNAP_REST){
-        if(Math.abs(cur-prevFinal)>0.5)setEdge(kids[i].id,prevFinal);
-        prevOrig=cur;
+      const id2=kids[i].id;
+      const curL=eL(id2),curR=eR(id2),cur=edge(id2);
+      if(Math.min(Math.abs(curL-prevL),Math.abs(curR-prevR))<=SNAP_REST){
+        if(Math.abs(cur-prevFinal)>0.5)setEdge(id2,prevFinal);
+        prevL=curL;prevR=curR;
       }else{
-        prevOrig=cur;prevFinal=cur;
+        prevL=curL;prevR=curR;prevFinal=cur;
       }
     }
     // fecha buracos: na mesma coluna, vão entre 15 e 80px (tag excluída do

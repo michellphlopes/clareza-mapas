@@ -886,19 +886,24 @@ function snapSiblings(m,els){
         prevL=curL;prevR=curR;prevFinal=cur;
       }
     }
-    // fecha buracos: na mesma coluna, distância à toa entre irmãos (até
-    // 400px) faz o de baixo escorregar pra cima até encostar — SEM trocar
-    // a ordem (fecha de cima pra baixo, na sequência); se houver obstáculo
-    // no caminho, as colisões devolvem só o necessário
-    for(let i=1;i<kids.length;i++){
-      const a=kids[i-1],b=kids[i];
-      if(Math.abs(edge(a.id)-edge(b.id))>1)continue;
-      const bottomA=_pos[a.id].y+els[a.id].offsetHeight/2;
-      const topB=_pos[b.id].y-els[b.id].offsetHeight/2;
-      const gap=topB-bottomA;
-      if(gap>15&&gap<=400){
-        const ny=bottomA+PACK_GAP+els[b.id].offsetHeight/2;
-        _pos[b.id].y=ny;m.nodes[b.id].fy=ny;
+    // fecha buracos: na mesma coluna, distância à toa entre irmãos (vão
+    // ORIGINAL de até 400px) faz o de baixo escorregar em cascata — SEM
+    // trocar a ordem; obstáculos as colisões devolvem só o necessário
+    if(kids.length>1){
+      let prevOrigBottom=_pos[kids[0].id].y+els[kids[0].id].offsetHeight/2;
+      let prevNewBottom=prevOrigBottom;
+      for(let i=1;i<kids.length;i++){
+        const a=kids[i-1],b=kids[i];
+        const hb=els[b.id].offsetHeight;
+        const topOrig=_pos[b.id].y-hb/2;
+        const gapOrig=topOrig-prevOrigBottom;
+        const alinhado=Math.abs(edge(a.id)-edge(b.id))<=1;
+        if(alinhado&&gapOrig>15&&gapOrig<=400){
+          const ny=prevNewBottom+PACK_GAP+hb/2;
+          _pos[b.id].y=ny;m.nodes[b.id].fy=ny;
+        }
+        prevOrigBottom=topOrig+hb;
+        prevNewBottom=_pos[b.id].y+hb/2;
       }
     }
   });

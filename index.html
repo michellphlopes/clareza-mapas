@@ -384,7 +384,7 @@ textarea.note:focus{border-color:var(--accent);background:var(--surface)}
         <button class="btn ghost sm" id="themeBtn" style="flex:1">◐ Tema</button>
       </div>
       <button class="btn ghost sm" id="exportBtn" style="width:100%">⭳ Exportar / Importar</button>
-      <div style="text-align:center;font-size:10px;color:var(--faint)">Clareza v42 · cresce pra frente</div>
+      <div style="text-align:center;font-size:10px;color:var(--faint)">Clareza v43 · cresce pra frente</div>
     </div>
   </aside>
 
@@ -772,59 +772,69 @@ function applyPositionsTidy(m,els){
 const HGAP=56, SUBPAD=12, BRANCH_GAP=24;
 // arruma um ramo inteiro relativo à âncora do topo: filhos na frente,
 // bandas verticais pela altura real, ordem SEMPRE pela sequência (ci)
-// EMPACOTAMENTO POR CONTORNO: cresce PRA FRENTE, não pra cima — irmão raso
-// se encaixa ao lado do conteúdo profundo do vizinho; a altura só aumenta
-// onde a coluna está realmente ocupada (as linhas esticam o que precisar)
-function packSubtree(m,els,id,dir){
-  const w=els[id]?els[id].offsetWidth:100, h=els[id]?els[id].offsetHeight:34;
-  const propria={id,dx:0,dy:0,w,h};
+// grupo de muitas FOLHAS vira grade de colunas (cresce pra frente, não pra
+// cima): nº de colunas cresce até a altura ficar <= COLMAX
+const COLMAX=6, COLW=150;
+function leafGrid(m,els,id){
+  const kids=children(m,id).filter(k=>els[k.id]);
+  const allLeaf=kids.length>COLMAX&&kids.every(k=>!children(m,k.id).length||m.nodes[k.id].collapsed);
+  if(!allLeaf)return null;
+  const cols=Math.ceil(kids.length/COLMAX);
+  const perCol=Math.ceil(kids.length/cols);
+  return {kids,cols,perCol};
+}
+// altura da sub-árvore (com grade de folhas quando aplicável)
+function subH(m,els,id){
   const n=m.nodes[id];
+  const own=(els[id]?els[id].offsetHeight:34)+VGAP;
   const kids=n.collapsed?[]:children(m,id).filter(k=>els[k.id]);
-  if(!kids.length)return{nodes:[propria],y1:-h/2,y2:h/2};
-  const packs=kids.map(k=>packSubtree(m,els,k.id,dir));
-  const placed=[],dys=[];
-  kids.forEach((k,i)=>{
-    const pk=packs[i];
-    const kw=els[k.id].offsetWidth;
-    const ax=dir>0?w+HGAP:-(HGAP+kw);
-    const rel=pk.nodes.map(nd=>({x1:ax+nd.dx,x2:ax+nd.dx+nd.w,y1:nd.dy-nd.h/2,y2:nd.dy+nd.h/2}));
-    let dy=0;
-    if(placed.length){
-      dy=-1e9;
-      rel.forEach(rb=>{placed.forEach(ra=>{
-        if(Math.min(ra.x2,rb.x2)-Math.max(ra.x1,rb.x1)>-10) // colunas se tocam
-          dy=Math.max(dy,ra.y2+16-rb.y1);
-      });});
-      if(dy===-1e9)dy=dys[dys.length-1]+h+VGAP; // colunas disjuntas (raro)
-    }
-    dys.push(dy);
-    rel.forEach(rb=>{placed.push({x1:rb.x1,x2:rb.x2,y1:rb.y1+dy,y2:rb.y2+dy});});
-  });
-  // minha tag centrada entre a primeira e a última TAG filha
-  const mid=(dys[0]+dys[dys.length-1])/2;
-  const nodes=[propria];
-  kids.forEach((k,i)=>{
-    const kw=els[k.id].offsetWidth;
-    const ax=dir>0?w+HGAP:-(HGAP+kw);
-    packs[i].nodes.forEach(nd=>{nodes.push({id:nd.id,dx:ax+nd.dx,dy:nd.dy+dys[i]-mid,w:nd.w,h:nd.h});});
-  });
-  let y1=1e9,y2=-1e9;
-  nodes.forEach(nd=>{y1=Math.min(y1,nd.dy-nd.h/2);y2=Math.max(y2,nd.dy+nd.h/2);});
-  return{nodes,y1,y2};
+  if(!kids.length)return own;
+  const g=leafGrid(m,els,id);
+  if(g){
+    let mx=0;for(let c=0;c<g.cols;c++){let s=0;for(let r=0;r<g.perCol;r++){const k=g.kids[c*g.perCol+r];if(k)s+=(els[k.id].offsetHeight)+VGAP;}mx=Math.max(mx,s);}
+    return Math.max(mx,own)+SUBPAD;
+  }
+  let s=0;kids.forEach(k=>{s+=subH(m,els,k.id);});
+  return Math.max(s,own)+SUBPAD;
 }
 function layoutBranch(m,els,topId,dir){
-  const pk=packSubtree(m,els,topId,dir);
-  const ax=_pos[topId].x, ay=_pos[topId].y;
-  pk.nodes.forEach(nd=>{
-    if(nd.id===topId)return;
-    _pos[nd.id]={x:ax+nd.dx,y:ay+nd.dy};
-    m.nodes[nd.id].fx=_pos[nd.id].x;m.nodes[nd.id].fy=_pos[nd.id].y;
-  });
+  (function place(id){
+    const n=m.nodes[id];
+    const kids=n.collapsed?[]:children(m,id).filter(k=>els[k.id]);
+    if(!kids.length)return;
+    const p=_pos[id],pw=els[id]?els[id].offsetWidth:100;
+    const g=leafGrid(m,els,id);
+    if(g){ // grade: colunas pra frente, cada coluna empilha perCol folhas
+      const colHs=[];
+      for(let c=0;c<g.cols;c++){let s=0;for(let r=0;r<g.perCol;r++){const k=g.kids[c*g.perCol+r];if(k)s+=els[k.id].offsetHeight+VGAP;}colHs.push(s);}
+      const totalH=Math.max(...colHs);
+      let x=dir>0?p.x+pw+HGAP:p.x-HGAP-COLW;
+      for(let c=0;c<g.cols;c++){
+        let cur=p.y-colHs[c]/2;
+        for(let r=0;r<g.perCol;r++){
+          const k=g.kids[c*g.perCol+r];if(!k)continue;
+          const kh=els[k.id].offsetHeight;
+          _pos[k.id]={x:dir>0?x:x+COLW-els[k.id].offsetWidth,y:cur+kh/2};
+          cur+=kh+VGAP;
+          m.nodes[k.id].fx=_pos[k.id].x;m.nodes[k.id].fy=_pos[k.id].y;
+        }
+        x=dir>0?x+COLW:x-COLW;
+      }
+      return;
+    }
+    let total=0;kids.forEach(k=>{total+=subH(m,els,k.id);});
+    let cur=p.y-total/2;
+    kids.forEach(k=>{
+      const band=subH(m,els,k.id);
+      const w=els[k.id]?els[k.id].offsetWidth:100;
+      _pos[k.id]={x:dir>0?p.x+pw+HGAP:p.x-HGAP-w,y:cur+band/2};
+      cur+=band;
+      m.nodes[k.id].fx=_pos[k.id].x;m.nodes[k.id].fy=_pos[k.id].y;
+      place(k.id);
+    });
+  })(topId);
 }
-function branchHeight(m,els,topId){
-  const pk=packSubtree(m,els,topId,1);
-  return pk.y2-pk.y1+VGAP;
-}
+function branchHeight(m,els,topId){return subH(m,els,topId);}
 function branchNodes(m,id){
   const out=[];
   (function rec(x){out.push(x);if(!m.nodes[x].collapsed)children(m,x).forEach(c=>rec(c.id));})(id);

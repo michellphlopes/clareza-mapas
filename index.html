@@ -384,7 +384,7 @@ textarea.note:focus{border-color:var(--accent);background:var(--surface)}
         <button class="btn ghost sm" id="themeBtn" style="flex:1">◐ Tema</button>
       </div>
       <button class="btn ghost sm" id="exportBtn" style="width:100%">⭳ Exportar / Importar</button>
-      <div style="text-align:center;font-size:10px;color:var(--faint)">Clareza v41 · motor por ramo</div>
+      <div style="text-align:center;font-size:10px;color:var(--faint)">Clareza v42 · cresce pra frente</div>
     </div>
   </aside>
 
@@ -772,42 +772,58 @@ function applyPositionsTidy(m,els){
 const HGAP=56, SUBPAD=12, BRANCH_GAP=24;
 // arruma um ramo inteiro relativo à âncora do topo: filhos na frente,
 // bandas verticais pela altura real, ordem SEMPRE pela sequência (ci)
+// EMPACOTAMENTO POR CONTORNO: cresce PRA FRENTE, não pra cima — irmão raso
+// se encaixa ao lado do conteúdo profundo do vizinho; a altura só aumenta
+// onde a coluna está realmente ocupada (as linhas esticam o que precisar)
+function packSubtree(m,els,id,dir){
+  const w=els[id]?els[id].offsetWidth:100, h=els[id]?els[id].offsetHeight:34;
+  const propria={id,dx:0,dy:0,w,h};
+  const n=m.nodes[id];
+  const kids=n.collapsed?[]:children(m,id).filter(k=>els[k.id]);
+  if(!kids.length)return{nodes:[propria],y1:-h/2,y2:h/2};
+  const packs=kids.map(k=>packSubtree(m,els,k.id,dir));
+  const placed=[],dys=[];
+  kids.forEach((k,i)=>{
+    const pk=packs[i];
+    const kw=els[k.id].offsetWidth;
+    const ax=dir>0?w+HGAP:-(HGAP+kw);
+    const rel=pk.nodes.map(nd=>({x1:ax+nd.dx,x2:ax+nd.dx+nd.w,y1:nd.dy-nd.h/2,y2:nd.dy+nd.h/2}));
+    let dy=0;
+    if(placed.length){
+      dy=-1e9;
+      rel.forEach(rb=>{placed.forEach(ra=>{
+        if(Math.min(ra.x2,rb.x2)-Math.max(ra.x1,rb.x1)>-10) // colunas se tocam
+          dy=Math.max(dy,ra.y2+16-rb.y1);
+      });});
+      if(dy===-1e9)dy=dys[dys.length-1]+h+VGAP; // colunas disjuntas (raro)
+    }
+    dys.push(dy);
+    rel.forEach(rb=>{placed.push({x1:rb.x1,x2:rb.x2,y1:rb.y1+dy,y2:rb.y2+dy});});
+  });
+  // minha tag centrada entre a primeira e a última TAG filha
+  const mid=(dys[0]+dys[dys.length-1])/2;
+  const nodes=[propria];
+  kids.forEach((k,i)=>{
+    const kw=els[k.id].offsetWidth;
+    const ax=dir>0?w+HGAP:-(HGAP+kw);
+    packs[i].nodes.forEach(nd=>{nodes.push({id:nd.id,dx:ax+nd.dx,dy:nd.dy+dys[i]-mid,w:nd.w,h:nd.h});});
+  });
+  let y1=1e9,y2=-1e9;
+  nodes.forEach(nd=>{y1=Math.min(y1,nd.dy-nd.h/2);y2=Math.max(y2,nd.dy+nd.h/2);});
+  return{nodes,y1,y2};
+}
 function layoutBranch(m,els,topId,dir){
-  const SH={};
-  const sh=id=>{
-    if(SH[id]!=null)return SH[id];
-    const own=(els[id]?els[id].offsetHeight:34)+VGAP;
-    const n=m.nodes[id];
-    const kids=n.collapsed?[]:children(m,id);
-    let s=0;kids.forEach(k=>{s+=sh(k.id);});
-    return SH[id]=kids.length?Math.max(s,own)+SUBPAD:own;
-  };
-  (function place(id){
-    const n=m.nodes[id];
-    const kids=n.collapsed?[]:children(m,id);
-    if(!kids.length)return;
-    const p=_pos[id],pw=els[id]?els[id].offsetWidth:100;
-    let total=0;kids.forEach(k=>{total+=sh(k.id);});
-    let cur=p.y-total/2;
-    kids.forEach(k=>{
-      const band=sh(k.id);
-      const w=els[k.id]?els[k.id].offsetWidth:100;
-      _pos[k.id]={x:dir>0?p.x+pw+HGAP:p.x-HGAP-w,y:cur+band/2};
-      cur+=band;
-      m.nodes[k.id].fx=_pos[k.id].x;m.nodes[k.id].fy=_pos[k.id].y;
-      place(k.id);
-    });
-  })(topId);
+  const pk=packSubtree(m,els,topId,dir);
+  const ax=_pos[topId].x, ay=_pos[topId].y;
+  pk.nodes.forEach(nd=>{
+    if(nd.id===topId)return;
+    _pos[nd.id]={x:ax+nd.dx,y:ay+nd.dy};
+    m.nodes[nd.id].fx=_pos[nd.id].x;m.nodes[nd.id].fy=_pos[nd.id].y;
+  });
 }
 function branchHeight(m,els,topId){
-  const rec=id=>{
-    const own=(els[id]?els[id].offsetHeight:34)+VGAP;
-    const n=m.nodes[id];
-    const kids=n.collapsed?[]:children(m,id);
-    let s=0;kids.forEach(k=>{s+=rec(k.id);});
-    return kids.length?Math.max(s,own)+SUBPAD:own;
-  };
-  return rec(topId);
+  const pk=packSubtree(m,els,topId,1);
+  return pk.y2-pk.y1+VGAP;
 }
 function branchNodes(m,id){
   const out=[];
